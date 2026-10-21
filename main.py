@@ -81,14 +81,15 @@ def generate_html_report(results):
     </html>
     """
     
-    os.makedirs('docs', exist_ok=True)
-    with open('docs/index.html', 'w', encoding='utf-8') as f:
+    # Menyimpan index.html langsung di direktori utama (root)
+    with open('index.html', 'w', encoding='utf-8') as f:
         f.write(html)
-    print("Report generated at docs/index.html")
+    print("Report generated at index.html")
 
 def main():
     config = load_config()
-    fetcher = DataFetcher(config['exchange'])
+    # Memastikan pemanggilan DataFetcher sesuai (menggunakan fallback yang baru dibuat)
+    fetcher = DataFetcher(config.get('exchange', 'binance'))
     all_results = []
     
     for symbol in config['symbols']:
