@@ -25,18 +25,12 @@ def generate_html_report(results):
             <div class="space-y-6">
     """
     
-    # --- FALLBACK JIKA DATA KOSONG ---
     if not results:
         html += """
         <div class="bg-red-900 border-l-4 border-red-500 p-6 mb-2 rounded shadow-lg">
-            <p class="font-bold text-xl text-red-300">⚠️ Gagal Mengambil Data (API Error)</p>
-            <p class="text-sm mt-2 text-gray-200">Mesin tidak dapat mengambil data dari Exchange. Ini biasanya terjadi karena:</p>
-            <ul class="list-disc list-inside text-sm mt-2 text-gray-300">
-                <li>IP GitHub Actions diblokir oleh Exchange (Binance sering melakukan ini).</li>
-                <li>Rate limit tercapai.</li>
-                <li>Simbol tidak tersedia di exchange yang dipilih.</li>
-            </ul>
-            <p class="text-xs mt-4 text-gray-400">Silakan cek tab <strong>Actions</strong> di repository GitHub Anda untuk melihat log error secara detail.</p>
+            <p class="font-bold text-xl text-red-300">⚠️ Gagal Mengambil Data</p>
+            <p class="text-sm mt-2 text-gray-200">Mesin tidak dapat mengambil data dari exchange. Periksa log GitHub Actions untuk detail error.</p>
+            <p class="text-xs mt-2 text-gray-400">Kemungkinan penyebab: IP GitHub Actions diblokir, rate limit, atau simbol tidak tersedia.</p>
         </div>
         """
     else:
@@ -50,7 +44,7 @@ def generate_html_report(results):
                 <p class="text-gray-400 mb-4">{res['reason']}</p>
             """
             
-            if 'monday_range' in res and res['monday_range']['high'] is not None:
+            if 'monday_range' in res and res['monday_range'].get('high') is not None:
                 html += f"""
                 <div class="grid grid-cols-2 gap-4 mb-4 text-sm bg-gray-900 p-4 rounded">
                     <div><span class="text-gray-500">Monday High:</span> <span class="text-white">{res['monday_range']['high']:.4f}</span></div>
@@ -81,26 +75,24 @@ def generate_html_report(results):
     </html>
     """
     
-    # Menyimpan index.html langsung di direktori utama (root)
-    with open('index.html', 'w', encoding='utf-8') as f:
+    os.makedirs('docs', exist_ok=True)
+    with open('docs/index.html', 'w', encoding='utf-8') as f:
         f.write(html)
-    print("Report generated at index.html")
+    print("Report generated at docs/index.html")
 
 def main():
     config = load_config()
-    # Memastikan pemanggilan DataFetcher sesuai (menggunakan fallback yang baru dibuat)
-    fetcher = DataFetcher(config.get('exchange', 'binance'))
+    fetcher = DataFetcher(config['exchange'])
     all_results = []
     
     for symbol in config['symbols']:
-        print(f"Analyzing {symbol}...")
+        print(f"--- Analyzing {symbol} ---")
         
-        # Fetch data HTF (Weekly) dan LTF (4H)
         df_htf = fetcher.fetch_ohlcv(symbol, config['timeframes']['htf'], limit=200)
         df_ltf = fetcher.fetch_ohlcv(symbol, config['timeframes']['ltf'], limit=200)
         
         if df_htf is None or df_ltf is None:
-            print(f"Failed to fetch data for {symbol}. Skipping.")
+            print(f"Skipping {symbol} due to data fetch failure.")
             continue
             
         analyzer = SignalGenerator(df_htf, df_ltf)
