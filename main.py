@@ -35,31 +35,48 @@ def generate_html_report(results):
         """
     else:
         for res in results:
-            status_color = "text-green-400" if res['status'] == "SIGNAL FOUND" else ("text-red-400" if res['status'] == "NO TRADE" else "text-yellow-400")
+            status = res.get('status', 'UNKNOWN')
+            reason = res.get('reason', 'No detailed reason provided.')
+            
+            status_color = "text-green-400" if status == "SIGNAL FOUND" else ("text-red-400" if status == "NO TRADE" else "text-yellow-400")
             
             html += f"""
             <div class="bg-gray-800 rounded-lg p-6 shadow-lg border border-gray-700">
-                <h2 class="text-2xl font-bold mb-4">{res['symbol']}</h2>
-                <p class="text-lg font-semibold mb-2">Status: <span class="{status_color}">{res['status']}</span></p>
-                <p class="text-gray-400 mb-4">{res['reason']}</p>
+                <h2 class="text-2xl font-bold mb-4">{res.get('symbol', 'Unknown')}</h2>
+                <p class="text-lg font-semibold mb-2">Status: <span class="{status_color}">{status}</span></p>
+                <p class="text-gray-400 mb-4">{reason}</p>
             """
             
-            if 'monday_range' in res and res['monday_range'].get('high') is not None:
+            # Tampilkan Monday Range jika ada
+            monday = res.get('monday_range', {})
+            if monday and monday.get('high') is not None:
                 html += f"""
                 <div class="grid grid-cols-2 gap-4 mb-4 text-sm bg-gray-900 p-4 rounded">
-                    <div><span class="text-gray-500">Monday High:</span> <span class="text-white">{res['monday_range']['high']:.4f}</span></div>
-                    <div><span class="text-gray-500">Monday Low:</span> <span class="text-white">{res['monday_range']['low']:.4f}</span></div>
+                    <div><span class="text-gray-500">Monday High:</span> <span class="text-white">{monday['high']:.4f}</span></div>
+                    <div><span class="text-gray-500">Monday Low:</span> <span class="text-white">{monday['low']:.4f}</span></div>
+                </div>
+                """
+            
+            # Tampilkan Boxes jika ada
+            boxes = res.get('boxes', {})
+            if boxes and boxes.get('support') is not None:
+                html += f"""
+                <div class="grid grid-cols-2 gap-4 mb-4 text-sm bg-gray-900 p-4 rounded">
+                    <div><span class="text-gray-500">Support (Box):</span> <span class="text-green-300">{boxes['support']:.4f}</span></div>
+                    <div><span class="text-gray-500">Resistance (Box):</span> <span class="text-red-300">{boxes['resistance']:.4f}</span></div>
                 </div>
                 """
                 
-            if res['status'] == "SIGNAL FOUND":
-                for sig in res['signals']:
-                    sig_color = "bg-green-900 border-green-500" if sig['type'] == "LONG" else "bg-red-900 border-red-500"
+            # Tampilkan Signals jika ada
+            if status == "SIGNAL FOUND":
+                signals = res.get('signals', [])
+                for sig in signals:
+                    sig_color = "bg-green-900 border-green-500" if sig.get('type') == "LONG" else "bg-red-900 border-red-500"
                     html += f"""
                     <div class="{sig_color} border-l-4 p-4 mb-2 rounded">
-                        <p class="font-bold">{sig['type']} - {sig['setup']}</p>
-                        <p class="text-sm">Entry: {sig['entry_price']:.4f} | SL (Invalidation): {sig['invalidation']:.4f}</p>
-                        <p class="text-xs text-gray-300 mt-1">{sig['reason']}</p>
+                        <p class="font-bold">{sig.get('type', 'UNKNOWN')} - {sig.get('setup', '')}</p>
+                        <p class="text-sm">Entry: {sig.get('entry_price', 0):.4f} | SL (Invalidation): {sig.get('invalidation', 0):.4f}</p>
+                        <p class="text-xs text-gray-300 mt-1">{sig.get('reason', '')}</p>
                     </div>
                     """
             html += "</div>"
