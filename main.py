@@ -1,6 +1,6 @@
 import yaml
 import os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from src.data_fetcher import DataFetcher
 from src.signal_generator import SignalGenerator
 
@@ -9,7 +9,20 @@ def load_config():
         return yaml.safe_load(file)
 
 def generate_html_report(results):
-    html = """
+    # --- LOGIKA WAKTU UTC & WIB ---
+    utc_now = datetime.now(timezone.utc)
+    wib_now = utc_now.astimezone(timezone(timedelta(hours=7)))
+    
+    time_str_utc = utc_now.strftime("%Y-%m-%d %H:%M:%S UTC")
+    time_str_wib = wib_now.strftime("%Y-%m-%d %H:%M:%S WIB")
+    
+    # --- HITUNG SINYAL ---
+    total_signals = sum(1 for res in results if res.get('status') == "SIGNAL FOUND")
+    total_wait = sum(1 for res in results if res.get('status') == "WAIT")
+    total_no_trade = sum(1 for res in results if res.get('status') == "NO TRADE")
+    total_error = sum(1 for res in results if res.get('status') == "ERROR")
+
+    html = f"""
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -17,36 +30,79 @@ def generate_html_report(results):
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Eliz-Style Crypto Analyzer</title>
         <script src="https://cdn.tailwindcss.com"></script>
-        <style>body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }</style>
+        <style>body {{ background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }}</style>
     </head>
     <body class="p-6">
-        <div class="max-w-5xl mx-auto">
-            <h1 class="text-3xl font-bold text-blue-400 mb-2">Eliz-Style Crypto Engine</h1>
-            <p class="text-gray-400 mb-8">Generated: """ + datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC") + """ | Rules: Monday Range, Sweep, Deviation, Reclaim.</p>
-            <div class="grid gap-6 md:grid-cols-2">
+        <div class="max-w-6xl mx-auto">
+            
+            <!-- HEADER -->
+            <div class="mb-8 border-b border-gray-700 pb-4">
+                <h1 class="text-4xl font-bold text-blue-400 mb-2">Eliz-Style Crypto Engine</h1>
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center text-sm text-gray-400">
+                    <p>Generated: <span class="text-gray-200">{time_str_utc}</span> | <span class="text-yellow-300">{time_str_wib}</span></p>
+                    <p class="mt-2 md:mt-0">Rules: Monday Range • Sweep • Deviation • Reclaim</p>
+                </div>
+            </div>
+
+            <!-- DASHBOARD RINGKASAN -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-gray-800 p-4 rounded-lg border border-green-500/30 text-center">
+                    <p class="text-3xl font-bold text-green-400">{total_signals}</p>
+                    <p class="text-xs text-gray-400 uppercase tracking-wide">Signals Found</p>
+                </div>
+                <div class="bg-gray-800 p-4 rounded-lg border border-yellow-500/30 text-center">
+                    <p class="text-3xl font-bold text-yellow-400">{total_wait}</p>
+                    <p class="text-xs text-gray-400 uppercase tracking-wide">Waiting</p>
+                </div>
+                <div class="bg-gray-800 p-4 rounded-lg border border-red-500/30 text-center">
+                    <p class="text-3xl font-bold text-red-400">{total_no_trade}</p>
+                    <p class="text-xs text-gray-400 uppercase tracking-wide">No Trade Zone</p>
+                </div>
+                <div class="bg-gray-800 p-4 rounded-lg border border-gray-600 text-center">
+                    <p class="text-3xl font-bold text-gray-400">{total_error}</p>
+                    <p class="text-xs text-gray-400 uppercase tracking-wide">Data Errors</p>
+                </div>
+            </div>
+
+            <!-- GRID KOIN -->
+            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
     """
     
     if not results:
-        html += "<p class='text-red-400'>Tidak ada data yang berhasil diproses.</p>"
+        html += "<p class='text-red-400 col-span-full'>Tidak ada data yang berhasil diproses.</p>"
     else:
+        # Urutkan: SIGNAL FOUND paling atas, lalu WAIT, lalu NO TRADE, terakhir ERROR
+        priority = {"SIGNAL FOUND": 1, "WAIT": 2, "NO TRADE": 3, "ERROR": 4}
+        results = sorted(results, key=lambda x: priority.get(x.get('status', 'ERROR'), 5))
+
         for res in results:
             status = res.get('status', 'UNKNOWN')
-            symbol = res.get('symbol', 'N/A')
+            symbol = res.get('symbol', 'N/A').replace('/USDT', '')
             reason = res.get('reason', 'No reason provided')
             
             # Pewarnaan Status
-            if status == "SIGNAL FOUND": badge = "bg-green-500 text-white"
-            elif status == "NO TRADE": badge = "bg-red-500 text-white"
-            elif status == "WAIT": badge = "bg-yellow-500 text-black"
-            else: badge = "bg-gray-500 text-white"
+            if status == "SIGNAL FOUND": 
+                badge = "bg-green-500 text-white shadow-[0_0_10px_rgba(34,197,94,0.5)]"
+                border = "border-green-500/50"
+            elif status == "NO TRADE": 
+                badge = "bg-red-500 text-white"
+                border = "border-gray-700"
+            elif status == "WAIT": 
+                badge = "bg-yellow-500 text-black"
+                border = "border-gray-700"
+            else: 
+                badge = "bg-gray-500 text-white"
+                border = "border-gray-700"
             
             html += f"""
-            <div class="bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-bold">{symbol}</h2>
-                    <span class="{badge} px-3 py-1 rounded-full text-xs font-bold">{status}</span>
+            <div class="bg-gray-800 rounded-xl shadow-lg p-5 border {border} flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <h2 class="text-xl font-bold text-gray-100">{symbol}</h2>
+                        <span class="{badge} px-2 py-1 rounded text-[10px] font-bold tracking-wider">{status}</span>
+                    </div>
+                    <p class="text-xs text-gray-400 mb-4 h-8">{reason}</p>
                 </div>
-                <p class="text-sm text-gray-300 mb-4">{reason}</p>
             """
             
             # Tampilkan Levels
@@ -54,35 +110,39 @@ def generate_html_report(results):
             boxes = res.get('boxes', {})
             if monday.get('high') and boxes.get('support'):
                 html += f"""
-                <div class="grid grid-cols-2 gap-2 text-xs mb-4 bg-gray-900 p-3 rounded-lg">
-                    <div><span class="text-gray-500">Mon High:</span> {monday['high']:.4f}</div>
-                    <div><span class="text-gray-500">Mon Low:</span> {monday['low']:.4f}</div>
-                    <div><span class="text-red-400">Box Res:</span> {boxes['resistance']:.4f}</div>
-                    <div><span class="text-green-400">Box Sup:</span> {boxes['support']:.4f}</div>
+                <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] mb-3 bg-gray-900 p-2 rounded-lg">
+                    <div class="text-gray-500">MR High:</div>
+                    <div class="text-right text-gray-200">{monday['high']:.4f}</div>
+                    <div class="text-gray-500">MR Low:</div>
+                    <div class="text-right text-gray-200">{monday['low']:.4f}</div>
+                    <div class="text-red-400/80 mt-1">Box Res:</div>
+                    <div class="text-right text-red-300 mt-1">{boxes['resistance']:.4f}</div>
+                    <div class="text-green-400/80">Box Sup:</div>
+                    <div class="text-right text-green-300">{boxes['support']:.4f}</div>
                 </div>
                 """
                 
             # Tampilkan Sinyal
             if status == "SIGNAL FOUND":
                 for sig in res.get('signals', []):
-                    color = "border-green-500 bg-green-900/30" if sig.get('type') == "LONG" else "border-red-500 bg-red-900/30"
+                    color = "border-green-500 bg-green-900/20 text-green-100" if sig.get('type') == "LONG" else "border-red-500 bg-red-900/20 text-red-100"
                     html += f"""
-                    <div class="border-l-4 {color} p-4 mb-2 rounded-r-lg">
-                        <p class="font-bold text-lg">{sig.get('type')} - {sig.get('setup')}</p>
-                        <div class="flex justify-between text-sm mt-2">
+                    <div class="border-l-4 {color} p-3 rounded-r-lg mt-2">
+                        <p class="font-bold text-sm mb-1">{sig.get('type')} - {sig.get('setup')}</p>
+                        <div class="flex justify-between text-xs mt-1">
                             <span>Entry: <strong>{sig.get('entry_price', 0):.4f}</strong></span>
-                            <span class="text-gray-400">SL: {sig.get('invalidation', 0):.4f}</span>
+                            <span class="opacity-70">SL: {sig.get('invalidation', 0):.4f}</span>
                         </div>
-                        <p class="text-xs text-gray-400 mt-2 italic">{sig.get('reason', '')}</p>
+                        <p class="text-[10px] opacity-80 mt-1 italic leading-tight">{sig.get('reason', '')}</p>
                     </div>
                     """
             html += "</div>"
             
     html += """
             </div>
-            <div class="mt-12 text-center text-xs text-gray-500 border-t border-gray-700 pt-4">
-                <p>Disclaimer: Bukan financial advice. Gunakan Risk Management 1-2%.</p>
-                <p class="mt-1">"Strategy gets you in. Discipline makes you money."</p>
+            <div class="mt-12 text-center text-xs text-gray-500 border-t border-gray-700 pt-6">
+                <p>Disclaimer: Bukan financial advice. Gunakan Risk Management 1-2% per trade.</p>
+                <p class="mt-1 text-gray-400">"Strategy gets you in. Discipline makes you money. Risk management keeps you in the market." — @eliz883</p>
             </div>
         </div>
     </body>
@@ -92,30 +152,32 @@ def generate_html_report(results):
     os.makedirs('docs', exist_ok=True)
     with open('docs/index.html', 'w', encoding='utf-8') as f:
         f.write(html)
-    print("HTML Report generated at docs/index.html")
+    print(f"Report generated. Found {total_signals} signals.")
 
 def main():
     config = load_config()
     fetcher = DataFetcher(config['exchange'])
     all_results = []
     
-    for symbol in config['symbols']:
-        print(f"--- Analyzing {symbol} ---")
+    print(f"Total coins to analyze: {len(config['symbols'])}")
+    
+    for i, symbol in enumerate(config['symbols']):
+        print(f"[{i+1}/{len(config['symbols'])}] Analyzing {symbol}...", end=" ")
         try:
             df_htf = fetcher.fetch_ohlcv(symbol, config['timeframes']['htf'], limit=200)
             df_ltf = fetcher.fetch_ohlcv(symbol, config['timeframes']['ltf'], limit=200)
             
             if df_htf is None or df_ltf is None:
-                raise ValueError("Gagal mengambil data dari Exchange (API Limit/Error)")
+                raise ValueError("Gagal fetch data API")
                 
             analyzer = SignalGenerator(df_htf, df_ltf)
             result = analyzer.analyze()
             result['symbol'] = symbol
             all_results.append(result)
+            print(f"-> {result['status']}")
             
         except Exception as e:
-            print(f"Error processing {symbol}: {e}")
-            # Jika ETH error, tetap dimasukkan ke report dengan status ERROR
+            print(f"-> ERROR: {e}")
             all_results.append({
                 "symbol": symbol,
                 "status": "ERROR",
