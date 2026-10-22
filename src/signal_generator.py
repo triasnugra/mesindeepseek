@@ -1,8 +1,6 @@
-import pandas as pd
-import numpy as np
 from .monday_range import MondayRange
-from .liquidity_engine import LiquidityEngine
 from .market_structure import MarketStructure
+from .liquidity_engine import LiquidityEngine
 
 class SignalGenerator:
     def __init__(self, df_htf, df_ltf):
@@ -10,71 +8,75 @@ class SignalGenerator:
         self.df_ltf = df_ltf
         
     def analyze(self):
-        # 1. Inisialisasi nilai default (Mencegah KeyError)
+        # 1. Default response (Mencegah KeyError)
         result = {
             "status": "WAIT",
-            "reason": "No clear setup found.",
+            "reason": "Menunggu setup...",
+            "current_price": self.df_ltf.iloc[-1]['close'],
             "monday_range": {"high": None, "low": None},
             "boxes": {"support": None, "resistance": None},
             "signals": []
         }
 
         try:
-            # 2. Hitung Monday Range dari data LTF (4H)
+            current_price = result["current_price"]
+
+            # 2. Ambil Level Kunci
             mr = MondayRange(self.df_ltf)
             mr_high, mr_low = mr.calculate()
             
-            if mr_high is None or mr_low is None:
-                result["reason"] = "Monday Range data not available."
-                return result
+            ms = MarketStructure(self.df_htf)
+            box_sup, box_res = ms.get_boxes()
             
             result["monday_range"] = {"high": mr_high, "low": mr_low}
+            result["boxes"] = {"support": box_sup, "resistance": box_res}
 
-            # 3. Hitung Struktur Pasar (Boxes) dari data HTF (Weekly)
-            ms = MarketStructure(self.df_htf)
-            support_series, resistance_series = ms.get_boxes()
-            
-            # Ambil nilai terbaru dari box
-            current_support = support_series.iloc[-1]
-            current_resistance = resistance_series.iloc[-1]
-            
-            result["boxes"] = {
-                "support": current_support, 
-                "resistance": current_resistance
-            }
-
-            current_price = self.df_ltf.iloc[-1]['close']
-            result["current_price"] = current_price
-
-            # 4. Cek No Trade Zone (Middle of Range)
-            # EliZ: "Jangan trade di middle of nowhere"
-            if ms.is_mid_range(current_price, current_support, current_resistance):
-                result["status"] = "NO TRADE"
-                result["reason"] = "Price is in the middle of the range (No Trade Zone). Sitting on hands is also a position."
+            if mr_high is None or box_sup is None:
+                result["reason"] = "Data history tidak cukup untuk menghitung level."
                 return result
 
-            # 5. Cek Liquidity Sweep & Reclaim
-            le = LiquidityEngine(self.df_ltf)
-            
-            # Kita cek sweep di area ekstrem: Monday Range ATAU Boxes
-            # Prioritas 1: Monday Range
-            signals = le.detect_sweep_and_reclaim(mr_high, mr_low)
-            
-            # Prioritas 2: Boxes (Support/Resistance) jika tidak ada sinyal di Monday Range
-            if not signals:
-                signals = le.detect_sweep_and_reclaim(current_resistance, current_support)
+            # 3. Cek No Trade Zone
+            zone_status, zone_reason = ms.check_zone(current_price, box_sup, box_res)
+            if zone_status == "NO TRADE":
+                result["status"] = "NO TRADE"
+                result["reason"] = zone_reason
+                return result
 
+            # 4. Cek Kedekatan (Proximity Check) - Maksimal 2.5% jarak
+            le = LiquidityEngine(self.df_ltf)
+            signals = []
+            
+            # Cek apakah harga sedang di area Monday Range
+            near_mr_high = mr_high and abs(current_price - mr_high) / mr_high <= 0.025
+            near_mr_low = mr_low and abs(current_price - mr_low) / mr_low <= 0.025
+            
+            # Cek apakah harga sedang di area Boxes Weekly
+            near_box_res = abs(current_price - box_res) / box_res <= 0.025
+            near_box_sup = abs(current_price - box_sup) / box_sup <= 0.025
+
+            # 5. Cari Trigger Sweep + Reclaim
+            if near_mr_high or near_box_res:
+                signals.extend(le.detect_setup(mr_high, None))
+                if not signals: signals.extend(le.detect_setup(box_res, None))
+                     
+            if near_mr_low or near_box_sup:
+                signals.extend(le.detect_setup(None, mr_low))
+                if not signals: signals.extend(le.detect_setup(None, box_sup))
+
+            # 6. Hasil Akhir
             if signals:
                 result["status"] = "SIGNAL FOUND"
-                result["reason"] = f"Found {len(signals)} setup(s) based on Liquidity Sweep + Reclaim."
+                result["reason"] = "Setup valid terdeteksi (Sweep + Reclaim)!"
                 result["signals"] = signals
             else:
                 result["status"] = "WAIT"
-                result["reason"] = "Price is at a key level, but no Sweep + Reclaim trigger yet. Wait for confirmation."
+                if near_mr_high or near_mr_low or near_box_res or near_box_sup:
+                    result["reason"] = "Harga di level kunci, TAPI belum ada Deviation + Reclaim. Jangan entry dulu."
+                else:
+                    result["reason"] = "Harga jauh dari level kunci (Monday Range / Boxes). Jangan chase harga."
 
         except Exception as e:
-            # Tangkap error agar mesin tidak crash
             result["status"] = "ERROR"
-            result["reason"] = f"Analysis engine error: {str(e)}"
+            result["reason"] = f"Engine Error: {str(e)}"
 
         return result
