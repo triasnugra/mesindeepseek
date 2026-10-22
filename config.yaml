@@ -1,13 +1,60 @@
 exchange: "gate"
 timeframes:
   htf: "1w"   # Weekly untuk 3 Boxes
-  mtf: "1d"   # Daily untuk struktur
+  mtf: "1d"   # Daily
   ltf: "4h"   # 4H untuk entry trigger
 
+# 40+ Koin Top CoinMarketCap (Tersedia di Exchange Besar)
 symbols:
   - "BTC/USDT"
   - "ETH/USDT"
+  - "BNB/USDT"
   - "SOL/USDT"
+  - "XRP/USDT"
+  - "ADA/USDT"
+  - "AVAX/USDT"
+  - "DOGE/USDT"
+  - "DOT/USDT"
+  - "LINK/USDT"
+  - "TON/USDT"
+  - "SHIB/USDT"
+  - "LTC/USDT"
+  - "BCH/USDT"
+  - "UNI/USDT"
+  - "NEAR/USDT"
+  - "APT/USDT"
+  - "ICP/USDT"
+  - "FIL/USDT"
+  - "IMX/USDT"
+  - "INJ/USDT"
+  - "HBAR/USDT"
+  - "ARB/USDT"
+  - "OP/USDT"
+  - "VET/USDT"
+  - "SUI/USDT"
+  - "MKR/USDT"
+  - "RENDER/USDT"
+  - "GRT/USDT"
+  - "AAVE/USDT"
+  - "THETA/USDT"
+  - "FTM/USDT"
+  - "RUNE/USDT"
+  - "SEI/USDT"
+  - "TIA/USDT"
+  - "ALGO/USDT"
+  - "QNT/USDT"
+  - "STX/USDT"
+  - "EGLD/USDT"
+  - "ASTER/USDT"
+  - "SAND/USDT"
+  - "MANA/USDT"
+  - "AXS/USDT"
+  - "GALA/USDT"
+  - "CHZ/USDT"
 
 monday_range:
   timezone: "UTC"
+
+risk_management:
+  max_risk_per_trade: 0.02
+  rr_ratio: 1.5
