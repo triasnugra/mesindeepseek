@@ -1,8 +1,8 @@
-exchange: "binance"
+exchange: "gateio"
 timeframes:
-  htf: "1w"   # Higher Timeframe untuk Boxes
-  mtf: "1d"   # Daily untuk struktur
-  ltf: "4h"   # Lower Timeframe untuk entry trigger
+  htf: "1w"
+  mtf: "1d"
+  ltf: "4h"
 
 symbols:
   - "BTC/USDT"
@@ -10,8 +10,8 @@ symbols:
   - "SOL/USDT"
 
 monday_range:
-  timezone: "UTC" # Sesuaikan dengan zona waktu bursa (misal: UTC atau EST)
+  timezone: "UTC"
 
 risk_management:
-  max_risk_per_trade: 0.02 # 2%
-  rr_ratio: 1.5 # Risk:Reward minimal 1:1.5
+  max_risk_per_trade: 0.02
+  rr_ratio: 1.5
