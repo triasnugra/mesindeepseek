@@ -9,14 +9,14 @@ def load_config():
         return yaml.safe_load(file)
 
 def generate_html_report(results):
-    # --- LOGIKA WAKTU UTC & WIB ---
+    # Waktu awal (akan diupdate oleh JavaScript di browser)
     utc_now = datetime.now(timezone.utc)
     wib_now = utc_now.astimezone(timezone(timedelta(hours=7)))
     
     time_str_utc = utc_now.strftime("%Y-%m-%d %H:%M:%S UTC")
     time_str_wib = wib_now.strftime("%Y-%m-%d %H:%M:%S WIB")
     
-    # --- HITUNG SINYAL ---
+    # Hitung Sinyal
     total_signals = sum(1 for res in results if res.get('status') == "SIGNAL FOUND")
     total_wait = sum(1 for res in results if res.get('status') == "WAIT")
     total_no_trade = sum(1 for res in results if res.get('status') == "NO TRADE")
@@ -31,6 +31,21 @@ def generate_html_report(results):
         <title>Eliz-Style Crypto Analyzer</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <style>body {{ background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }}</style>
+        <script>
+            // JavaScript untuk Jam Real-time
+            function updateClock() {{
+                const now = new Date();
+                const utcString = now.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+                
+                // WIB adalah UTC+7
+                const wibDate = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+                const wibString = wibDate.toISOString().replace('T', ' ').substring(0, 19) + ' WIB';
+                
+                document.getElementById('live-clock').innerHTML = `Generated: <span class="text-gray-200">${{utcString}}</span> | <span class="text-yellow-300">${{wibString}}</span>`;
+            }}
+            setInterval(updateClock, 1000);
+            window.onload = updateClock;
+        </script>
     </head>
     <body class="p-6">
         <div class="max-w-6xl mx-auto">
@@ -39,7 +54,7 @@ def generate_html_report(results):
             <div class="mb-8 border-b border-gray-700 pb-4">
                 <h1 class="text-4xl font-bold text-blue-400 mb-2">Eliz-Style Crypto Engine</h1>
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center text-sm text-gray-400">
-                    <p>Generated: <span class="text-gray-200">{time_str_utc}</span> | <span class="text-yellow-300">{time_str_wib}</span></p>
+                    <p id="live-clock">Generated: <span class="text-gray-200">{time_str_utc}</span> | <span class="text-yellow-300">{time_str_wib}</span></p>
                     <p class="mt-2 md:mt-0">Rules: Monday Range • Sweep • Deviation • Reclaim</p>
                 </div>
             </div>
@@ -71,7 +86,6 @@ def generate_html_report(results):
     if not results:
         html += "<p class='text-red-400 col-span-full'>Tidak ada data yang berhasil diproses.</p>"
     else:
-        # Urutkan: SIGNAL FOUND paling atas, lalu WAIT, lalu NO TRADE, terakhir ERROR
         priority = {"SIGNAL FOUND": 1, "WAIT": 2, "NO TRADE": 3, "ERROR": 4}
         results = sorted(results, key=lambda x: priority.get(x.get('status', 'ERROR'), 5))
 
@@ -79,8 +93,8 @@ def generate_html_report(results):
             status = res.get('status', 'UNKNOWN')
             symbol = res.get('symbol', 'N/A').replace('/USDT', '')
             reason = res.get('reason', 'No reason provided')
+            current_price = res.get('current_price', 0)
             
-            # Pewarnaan Status
             if status == "SIGNAL FOUND": 
                 badge = "bg-green-500 text-white shadow-[0_0_10px_rgba(34,197,94,0.5)]"
                 border = "border-green-500/50"
@@ -97,15 +111,16 @@ def generate_html_report(results):
             html += f"""
             <div class="bg-gray-800 rounded-xl shadow-lg p-5 border {border} flex flex-col justify-between">
                 <div>
-                    <div class="flex justify-between items-center mb-3">
+                    <div class="flex justify-between items-center mb-1">
                         <h2 class="text-xl font-bold text-gray-100">{symbol}</h2>
                         <span class="{badge} px-2 py-1 rounded text-[10px] font-bold tracking-wider">{status}</span>
                     </div>
-                    <p class="text-xs text-gray-400 mb-4 h-8">{reason}</p>
+                    <!-- CURRENT PRICE DITAMBAHKAN DI SINI -->
+                    <p class="text-sm font-semibold text-blue-300 mb-2">Price: ${current_price:.4f}</p>
+                    <p class="text-xs text-gray-400 mb-4 h-8 leading-tight">{reason}</p>
                 </div>
             """
             
-            # Tampilkan Levels
             monday = res.get('monday_range', {})
             boxes = res.get('boxes', {})
             if monday.get('high') and boxes.get('support'):
@@ -122,18 +137,28 @@ def generate_html_report(results):
                 </div>
                 """
                 
-            # Tampilkan Sinyal
             if status == "SIGNAL FOUND":
                 for sig in res.get('signals', []):
                     color = "border-green-500 bg-green-900/20 text-green-100" if sig.get('type') == "LONG" else "border-red-500 bg-red-900/20 text-red-100"
                     html += f"""
-                    <div class="border-l-4 {color} p-3 rounded-r-lg mt-2">
-                        <p class="font-bold text-sm mb-1">{sig.get('type')} - {sig.get('setup')}</p>
-                        <div class="flex justify-between text-xs mt-1">
-                            <span>Entry: <strong>{sig.get('entry_price', 0):.4f}</strong></span>
-                            <span class="opacity-70">SL: {sig.get('invalidation', 0):.4f}</span>
+                    <div class="border-l-4 {color} p-3 rounded-r-lg mt-2 text-sm">
+                        <p class="font-bold mb-2">{sig.get('type')} - {sig.get('setup')}</p>
+                        
+                        <!-- ENTRY, SL, TP DITAMPILKAN LEBIH JELAS -->
+                        <div class="grid grid-cols-3 gap-1 text-[11px] bg-black/20 p-2 rounded">
+                            <div class="text-center">
+                                <span class="block text-gray-400">Entry</span>
+                                <strong>{sig.get('entry_price', 0):.4f}</strong>
+                            </div>
+                            <div class="text-center border-l border-white/10">
+                                <span class="block text-red-400">Stop Loss</span>
+                                <strong>{sig.get('invalidation', 0):.4f}</strong>
+                            </div>
+                            <div class="text-center border-l border-white/10">
+                                <span class="block text-green-400">Target (1:2)</span>
+                                <strong>{sig.get('take_profit', 0):.4f}</strong>
+                            </div>
                         </div>
-                        <p class="text-[10px] opacity-80 mt-1 italic leading-tight">{sig.get('reason', '')}</p>
                     </div>
                     """
             html += "</div>"
@@ -182,6 +207,7 @@ def main():
                 "symbol": symbol,
                 "status": "ERROR",
                 "reason": f"System Error: {str(e)}",
+                "current_price": 0,
                 "monday_range": {"high": None, "low": None},
                 "boxes": {"support": None, "resistance": None},
                 "signals": []
