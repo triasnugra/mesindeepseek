@@ -1,8 +1,8 @@
 exchange: "gate"
 timeframes:
-  htf: "1w"
-  mtf: "1d"
-  ltf: "4h"
+  htf: "1w"   # Weekly untuk 3 Boxes
+  mtf: "1d"   # Daily untuk struktur
+  ltf: "4h"   # 4H untuk entry trigger
 
 symbols:
   - "BTC/USDT"
@@ -11,7 +11,3 @@ symbols:
 
 monday_range:
   timezone: "UTC"
-
-risk_management:
-  max_risk_per_trade: 0.02
-  rr_ratio: 1.5
