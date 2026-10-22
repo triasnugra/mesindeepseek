@@ -5,20 +5,21 @@ class MondayRange:
         self.df = df
     
     def calculate(self):
-        # Pastikan index adalah datetime
-        if not isinstance(self.df.index, pd.DatetimeIndex):
-            raise ValueError("DataFrame index must be DatetimeIndex")
-            
-        # Filter hanya hari Senin (0 = Monday)
-        monday_data = self.df[self.df.index.dayofweek == 0]
+        # Pastikan data adalah Daily untuk akurasi
+        df_daily = self.df.resample('1D').agg({'high': 'max', 'low': 'min'}).dropna()
         
-        if monday_data.empty:
+        # Cari hari Senin (0 = Monday)
+        mondays = df_daily[df_daily.index.dayofweek == 0]
+        
+        if mondays.empty:
             return None, None
             
-        # Ambil High dan Low dari hari Senin terakhir
-        # (Biasanya diambil dari minggu berjalan atau minggu sebelumnya)
-        last_monday = monday_data.iloc[-1]
-        monday_high = last_monday['high']
-        monday_low = last_monday['low']
+        # Ambil data Senin terakhir yang sudah selesai (bukan hari ini jika hari ini Senin)
+        today = pd.Timestamp.now(tz=df_daily.index.tz).normalize()
+        valid_mondays = mondays[mondays.index < today]
         
-        return monday_high, monday_low
+        if valid_mondays.empty:
+            return None, None
+            
+        last_monday = valid_mondays.iloc[-1]
+        return last_monday['high'], last_monday['low']
