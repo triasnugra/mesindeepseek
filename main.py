@@ -17,75 +17,72 @@ def generate_html_report(results):
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Eliz-Style Crypto Analyzer</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <style>body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }</style>
     </head>
-    <body class="bg-gray-900 text-gray-100 font-sans p-8">
-        <div class="max-w-4xl mx-auto">
-            <h1 class="text-3xl font-bold text-blue-400 mb-2">Eliz-Style Crypto Analysis Engine</h1>
-            <p class="text-gray-400 mb-6">Generated on: """ + datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC") + """</p>
-            <div class="space-y-6">
+    <body class="p-6">
+        <div class="max-w-5xl mx-auto">
+            <h1 class="text-3xl font-bold text-blue-400 mb-2">Eliz-Style Crypto Engine</h1>
+            <p class="text-gray-400 mb-8">Generated: """ + datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC") + """ | Rules: Monday Range, Sweep, Deviation, Reclaim.</p>
+            <div class="grid gap-6 md:grid-cols-2">
     """
     
     if not results:
-        html += """
-        <div class="bg-red-900 border-l-4 border-red-500 p-6 mb-2 rounded shadow-lg">
-            <p class="font-bold text-xl text-red-300">⚠️ Gagal Mengambil Data</p>
-            <p class="text-sm mt-2 text-gray-200">Mesin tidak dapat mengambil data dari exchange. Periksa log GitHub Actions untuk detail error.</p>
-            <p class="text-xs mt-2 text-gray-400">Kemungkinan penyebab: IP GitHub Actions diblokir, rate limit, atau simbol tidak tersedia.</p>
-        </div>
-        """
+        html += "<p class='text-red-400'>Tidak ada data yang berhasil diproses.</p>"
     else:
         for res in results:
             status = res.get('status', 'UNKNOWN')
-            reason = res.get('reason', 'No detailed reason provided.')
+            symbol = res.get('symbol', 'N/A')
+            reason = res.get('reason', 'No reason provided')
             
-            status_color = "text-green-400" if status == "SIGNAL FOUND" else ("text-red-400" if status == "NO TRADE" else "text-yellow-400")
+            # Pewarnaan Status
+            if status == "SIGNAL FOUND": badge = "bg-green-500 text-white"
+            elif status == "NO TRADE": badge = "bg-red-500 text-white"
+            elif status == "WAIT": badge = "bg-yellow-500 text-black"
+            else: badge = "bg-gray-500 text-white"
             
             html += f"""
-            <div class="bg-gray-800 rounded-lg p-6 shadow-lg border border-gray-700">
-                <h2 class="text-2xl font-bold mb-4">{res.get('symbol', 'Unknown')}</h2>
-                <p class="text-lg font-semibold mb-2">Status: <span class="{status_color}">{status}</span></p>
-                <p class="text-gray-400 mb-4">{reason}</p>
+            <div class="bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold">{symbol}</h2>
+                    <span class="{badge} px-3 py-1 rounded-full text-xs font-bold">{status}</span>
+                </div>
+                <p class="text-sm text-gray-300 mb-4">{reason}</p>
             """
             
-            # Tampilkan Monday Range jika ada
+            # Tampilkan Levels
             monday = res.get('monday_range', {})
-            if monday and monday.get('high') is not None:
-                html += f"""
-                <div class="grid grid-cols-2 gap-4 mb-4 text-sm bg-gray-900 p-4 rounded">
-                    <div><span class="text-gray-500">Monday High:</span> <span class="text-white">{monday['high']:.4f}</span></div>
-                    <div><span class="text-gray-500">Monday Low:</span> <span class="text-white">{monday['low']:.4f}</span></div>
-                </div>
-                """
-            
-            # Tampilkan Boxes jika ada
             boxes = res.get('boxes', {})
-            if boxes and boxes.get('support') is not None:
+            if monday.get('high') and boxes.get('support'):
                 html += f"""
-                <div class="grid grid-cols-2 gap-4 mb-4 text-sm bg-gray-900 p-4 rounded">
-                    <div><span class="text-gray-500">Support (Box):</span> <span class="text-green-300">{boxes['support']:.4f}</span></div>
-                    <div><span class="text-gray-500">Resistance (Box):</span> <span class="text-red-300">{boxes['resistance']:.4f}</span></div>
+                <div class="grid grid-cols-2 gap-2 text-xs mb-4 bg-gray-900 p-3 rounded-lg">
+                    <div><span class="text-gray-500">Mon High:</span> {monday['high']:.4f}</div>
+                    <div><span class="text-gray-500">Mon Low:</span> {monday['low']:.4f}</div>
+                    <div><span class="text-red-400">Box Res:</span> {boxes['resistance']:.4f}</div>
+                    <div><span class="text-green-400">Box Sup:</span> {boxes['support']:.4f}</div>
                 </div>
                 """
                 
-            # Tampilkan Signals jika ada
+            # Tampilkan Sinyal
             if status == "SIGNAL FOUND":
-                signals = res.get('signals', [])
-                for sig in signals:
-                    sig_color = "bg-green-900 border-green-500" if sig.get('type') == "LONG" else "bg-red-900 border-red-500"
+                for sig in res.get('signals', []):
+                    color = "border-green-500 bg-green-900/30" if sig.get('type') == "LONG" else "border-red-500 bg-red-900/30"
                     html += f"""
-                    <div class="{sig_color} border-l-4 p-4 mb-2 rounded">
-                        <p class="font-bold">{sig.get('type', 'UNKNOWN')} - {sig.get('setup', '')}</p>
-                        <p class="text-sm">Entry: {sig.get('entry_price', 0):.4f} | SL (Invalidation): {sig.get('invalidation', 0):.4f}</p>
-                        <p class="text-xs text-gray-300 mt-1">{sig.get('reason', '')}</p>
+                    <div class="border-l-4 {color} p-4 mb-2 rounded-r-lg">
+                        <p class="font-bold text-lg">{sig.get('type')} - {sig.get('setup')}</p>
+                        <div class="flex justify-between text-sm mt-2">
+                            <span>Entry: <strong>{sig.get('entry_price', 0):.4f}</strong></span>
+                            <span class="text-gray-400">SL: {sig.get('invalidation', 0):.4f}</span>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-2 italic">{sig.get('reason', '')}</p>
                     </div>
                     """
             html += "</div>"
             
     html += """
             </div>
-            <div class="mt-8 text-center text-sm text-gray-500">
-                <p>Disclaimer: This is an automated analysis tool, not financial advice.</p>
-                <p class="mt-2">"Strategy gets you in. Discipline makes you money." - @eliz883</p>
+            <div class="mt-12 text-center text-xs text-gray-500 border-t border-gray-700 pt-4">
+                <p>Disclaimer: Bukan financial advice. Gunakan Risk Management 1-2%.</p>
+                <p class="mt-1">"Strategy gets you in. Discipline makes you money."</p>
             </div>
         </div>
     </body>
@@ -95,7 +92,7 @@ def generate_html_report(results):
     os.makedirs('docs', exist_ok=True)
     with open('docs/index.html', 'w', encoding='utf-8') as f:
         f.write(html)
-    print("Report generated at docs/index.html")
+    print("HTML Report generated at docs/index.html")
 
 def main():
     config = load_config()
@@ -104,19 +101,30 @@ def main():
     
     for symbol in config['symbols']:
         print(f"--- Analyzing {symbol} ---")
-        
-        df_htf = fetcher.fetch_ohlcv(symbol, config['timeframes']['htf'], limit=200)
-        df_ltf = fetcher.fetch_ohlcv(symbol, config['timeframes']['ltf'], limit=200)
-        
-        if df_htf is None or df_ltf is None:
-            print(f"Skipping {symbol} due to data fetch failure.")
-            continue
+        try:
+            df_htf = fetcher.fetch_ohlcv(symbol, config['timeframes']['htf'], limit=200)
+            df_ltf = fetcher.fetch_ohlcv(symbol, config['timeframes']['ltf'], limit=200)
             
-        analyzer = SignalGenerator(df_htf, df_ltf)
-        result = analyzer.analyze()
-        result['symbol'] = symbol
-        all_results.append(result)
-        
+            if df_htf is None or df_ltf is None:
+                raise ValueError("Gagal mengambil data dari Exchange (API Limit/Error)")
+                
+            analyzer = SignalGenerator(df_htf, df_ltf)
+            result = analyzer.analyze()
+            result['symbol'] = symbol
+            all_results.append(result)
+            
+        except Exception as e:
+            print(f"Error processing {symbol}: {e}")
+            # Jika ETH error, tetap dimasukkan ke report dengan status ERROR
+            all_results.append({
+                "symbol": symbol,
+                "status": "ERROR",
+                "reason": f"System Error: {str(e)}",
+                "monday_range": {"high": None, "low": None},
+                "boxes": {"support": None, "resistance": None},
+                "signals": []
+            })
+            
     generate_html_report(all_results)
 
 if __name__ == "__main__":
