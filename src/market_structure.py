@@ -2,19 +2,23 @@ class MarketStructure:
     def __init__(self, df):
         self.df = df
         
-    def get_boxes(self, window=20):
-        # Menggunakan rolling min/max sederhana sebagai proxy Boxes
-        # Di produksi, Anda bisa menggunakan algoritma ZigZag atau Fractal
-        resistance = self.df['high'].rolling(window=window).max()
-        support = self.df['low'].rolling(window=window).min()
+    def get_boxes(self, lookback_weeks=52):
+        # Ambil lookback 1 tahun (52 minggu) untuk menentukan Boxes makro
+        recent_data = self.df.tail(lookback_weeks)
+        resistance = recent_data['high'].max()
+        support = recent_data['low'].min()
         return support, resistance
 
-    def is_mid_range(self, current_price, support, resistance):
-        # Cek apakah harga berada di tengah-tengah (No Trade Zone)
-        mid = (support + resistance) / 2
+    def check_zone(self, current_price, support, resistance):
         range_size = resistance - support
+        if range_size <= 0:
+            return "NO TRADE", "Invalid Range"
+
+        # Middle of Range (No Trade Zone) = 30% area tengah
+        mid_lower = support + (range_size * 0.35)
+        mid_upper = support + (range_size * 0.65)
         
-        # Jika harga berada dalam 20% dari titik tengah, anggap No Trade Zone
-        if abs(current_price - mid) < (range_size * 0.2):
-            return True
-        return False
+        if mid_lower <= current_price <= mid_upper:
+            return "NO TRADE", f"Harga di middle of range ({mid_lower:.2f} - {mid_upper:.2f}). Sitting on hands is also a position."
+            
+        return "TRADEABLE", "Harga di area ekstrem."
