@@ -1,4 +1,4 @@
-exchange: "gateio"
+exchange: "gate"
 timeframes:
   htf: "1w"
   mtf: "1d"
