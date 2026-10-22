@@ -3,7 +3,7 @@ import pandas as pd
 import time
 
 class DataFetcher:
-    def __init__(self, exchange_id='gateio'):
+    def __init__(self, exchange_id='gate'):  # <-- Ubah 'gateio' menjadi 'gate'
         exchange_class = getattr(ccxt, exchange_id)
         self.exchange = exchange_class({
             'enableRateLimit': True,
